@@ -9,6 +9,7 @@ from auth.utils import get_current_user
 from database import get_async_session
 from notes.models import Note
 from notes.schema import NoteResponse, NoteCreate
+from notes.utils import validate_text
 
 router = APIRouter(
     prefix="/notes",
@@ -22,7 +23,11 @@ async def create_note(
     db: AsyncSession = Depends(get_async_session),
     user: UserResponse = Depends(get_current_user),
 ):
-    db_note = Note(title=note.title, content=note.content, owner_id=user.id)
+    try:
+        corrected_text = await validate_text(note.content)
+    except Exception:
+        corrected_text = note.content + '_uncorrected'
+    db_note = Note(title=note.title, content=corrected_text, owner_id=user.id)
     db.add(db_note)
     await db.commit()
     await db.refresh(db_note)

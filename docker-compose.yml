@@ -1,0 +1,27 @@
+version: '3.3'
+
+services:
+  web:
+    build: .
+    command: bash -c 'while !</dev/tcp/postgres/5432; do sleep 1; done; alembic upgrade head && uvicorn main:app --host 0.0.0.0'
+    ports:
+      - 8000:8000
+    depends_on:
+      - postgres
+    environment:
+      WAIT_HOSTS: ${DB_HOST}:${DB_PORT}
+
+  postgres:
+    container_name: ${DB_HOST}
+    image: postgres:16-alpine
+    volumes:
+      - pg_data:/var/lib/postgresql/data/
+    ports:
+      - ${DB_PORT}:${DB_PORT}
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+
+volumes:
+  pg_data:
