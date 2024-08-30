@@ -3,7 +3,7 @@ from httpx import AsyncClient
 
 async def test_create_note(async_client_test: AsyncClient, setup_user):
     response = await async_client_test.post(
-        "/auth/token/", json={"username": "string", "password": "string"}
+        "/auth/token/", data={"username": "string", "password": "string"}
     )
     token = response.json().get("access_token")
 
@@ -22,7 +22,7 @@ async def test_create_note(async_client_test: AsyncClient, setup_user):
 async def test_read_notes(async_client_test: AsyncClient, setup_user):
     # Create a note first
     response = await async_client_test.post(
-        "/auth/token/", json={"username": "string", "password": "string"}
+        "/auth/token/", data={"username": "string", "password": "string"}
     )
     token = response.json().get("access_token")
 
