@@ -11,4 +11,3 @@ class User(Base):
     hashed_password = Column(String)
 
     notes = relationship("Note", back_populates="owner")
-

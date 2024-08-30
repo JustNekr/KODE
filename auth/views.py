@@ -1,12 +1,12 @@
-from typing import Annotated
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from auth.models import User
-from auth.schema import UserCreate, UserResponse, Token
+from auth.schema import UserCreate, UserResponse, Token, TokenRequest
 from auth.utils import (
     authenticate_user,
     create_access_token,
@@ -15,7 +15,6 @@ from auth.utils import (
 from config import settings
 from database import get_async_session
 
-from fastapi.security import OAuth2PasswordRequestForm
 
 router = APIRouter(
     prefix="/auth",
@@ -25,10 +24,13 @@ router = APIRouter(
 
 @router.post("/token/", response_model=Token)
 async def login(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    token_request: TokenRequest,
     session: AsyncSession = Depends(get_async_session),
 ):
-    user = await authenticate_user(session, UserCreate(username=form_data.username, password=form_data.password))
+    user = await authenticate_user(
+        session,
+        UserCreate(username=token_request.username, password=token_request.password),
+    )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -44,15 +46,19 @@ async def login(
 
 @router.post("/user/", response_model=UserResponse)
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_async_session)):
-    async with db.begin():
-        result = await db.execute(select(User).filter_by(username=user.username))
-        db_user = result.scalars().first()
-        if db_user:
-            raise HTTPException(status_code=400, detail="Username already registered")
-        hashed_password = get_password_hash(user.password)
-        db_user = User(username=user.username, hashed_password=hashed_password)
-        db.add(db_user)
-
-    await db.commit()
-    await db.refresh(db_user)
-    return db_user
+    try:
+        async with db.begin():
+            result = await db.execute(select(User).filter_by(username=user.username))
+            db_user = result.scalars().first()
+            if db_user:
+                raise HTTPException(
+                    status_code=400, detail="Username already registered"
+                )
+            hashed_password = get_password_hash(user.password)
+            db_user = User(username=user.username, hashed_password=hashed_password)
+            db.add(db_user)
+        await db.commit()
+        await db.refresh(db_user)
+        return db_user
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error occurred")
